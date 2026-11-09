@@ -26,6 +26,10 @@
 // ------------------------------------------------------------
 void soilInit() {
   // TODO(淯瑋)
+  #if !SIMULATE_SENSORS
+    analogReadResolution(10);  // 原始值範圍 0～1023
+    pinMode(PIN_SOIL_SENSOR, INPUT);
+  #endif
 }
 
 
@@ -42,7 +46,24 @@ void soilInit() {
 // ------------------------------------------------------------
 int readSoilRaw() {
   // TODO(淯瑋)
-  return 0;  // 暫時的回傳值，只是為了能編譯，實作後刪除
+  long sum = 0;
+  bool valid = true;
+
+  for (int i = 0; i < 8; ++i) {
+    int value = analogRead(PIN_SOIL_SENSOR);
+
+    if (value <= 0 || value >= 1023) {
+      valid = false;
+    }
+
+    sum += value;
+  }
+
+  if (!valid) {
+    return -1;
+  }
+
+  return (sum + 4) / 8;  // 四捨五入後的平均值
 }
 
 
@@ -59,5 +80,24 @@ int readSoilRaw() {
 // ------------------------------------------------------------
 int readSoilMoisture() {
   // TODO(淯瑋)
-  return -1;  // 暫時的回傳值，只是為了能編譯，實作後刪除
+  #if SIMULATE_SENSORS
+    return simMoisture;
+  #else
+    int raw = readSoilRaw();
+
+    if (raw == -1) {
+      return -1;
+    }
+
+    long range = (long)SOIL_RAW_DRY - SOIL_RAW_WET;
+
+    if (range <= 0) {
+      return -1;  // 這版換算要求乾端點大於濕端點
+    }
+
+    long moisture =
+        (((long)SOIL_RAW_DRY - raw) * 100 + range / 2) / range;
+
+    return (int)constrain(moisture, 0L, 100L);
+  #endif
 }

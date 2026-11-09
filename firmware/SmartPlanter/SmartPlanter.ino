@@ -20,6 +20,9 @@
 int  simMoisture;
 bool simLowWater;
 
+// 最新濕度與上次量測時間
+int latestMoisture = -1;
+unsigned long lastSampleAt = 0;
 
 // ------------------------------------------------------------
 // void setup()
@@ -33,6 +36,19 @@ bool simLowWater;
 // ------------------------------------------------------------
 void setup() {
   // TODO(建瑄)
+
+  Serial.begin(9600);
+
+  actuatorsInit();
+  soilInit();
+  safetyInit();
+  controlInit();
+  notifyInit();
+
+  latestMoisture = readSoilMoisture();
+  lastSampleAt = millis();
+
+  printStatus();
 }
 
 
@@ -50,6 +66,25 @@ void setup() {
 // ------------------------------------------------------------
 void loop() {
   // TODO(建瑄)
+
+  #if SIMULATE_SENSORS
+    handleSerialCommands();
+  #endif
+
+    bool lowWater = checkWaterSafety();
+
+    unsigned long now = millis();
+
+    if ((unsigned long)(now - lastSampleAt) >= SAMPLE_INTERVAL_MS) {
+      lastSampleAt = now;
+      latestMoisture = readSoilMoisture();
+      printStatus();
+    }
+
+    controlUpdate(latestMoisture);
+    updateAlerts(lowWater, latestMoisture);
+    notifyUpdate();
+
 }
 
 
@@ -76,6 +111,15 @@ void updateAlerts(bool lowWater, int moisture) {
 // ------------------------------------------------------------
 void printStatus() {
   // TODO(建瑄)
+
+  Serial.print("Soil moisture: ");
+
+  if (latestMoisture == -1) {
+    Serial.println("SENSOR_FAULT");
+  } else {
+    Serial.print(latestMoisture);
+    Serial.println("%");
+  }
 }
 
 

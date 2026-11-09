@@ -14,6 +14,7 @@
 #include "config.h"
 #include "interfaces.h"
 
+static bool fanRunning = false;
 
 // ------------------------------------------------------------
 // void actuatorsInit()
@@ -24,6 +25,15 @@
 // ------------------------------------------------------------
 void actuatorsInit() {
   // TODO(玟君)
+
+  // 先設定關閉電位，再切換成輸出
+  digitalWrite(PIN_FAN_INA, LOW);
+  digitalWrite(PIN_FAN_INB, LOW);
+
+  pinMode(PIN_FAN_INA, OUTPUT);
+  pinMode(PIN_FAN_INB, OUTPUT);
+
+  fanRunning = false;
 }
 
 
@@ -59,11 +69,19 @@ bool isPumpOn() {
 // 功能：透過繼電器打開或關閉風扇，並記錄目前狀態。
 // ------------------------------------------------------------
 void fanOn() {
-  // TODO(玟君)
+  // TODO(淯瑋)
+  digitalWrite(PIN_FAN_INA, LOW);
+  digitalWrite(PIN_FAN_INB, HIGH);
+
+  fanRunning = true;
 }
 
 void fanOff() {
-  // TODO(玟君)
+  // TODO(淯瑋)
+  digitalWrite(PIN_FAN_INA, LOW);
+  digitalWrite(PIN_FAN_INB, LOW);
+
+  fanRunning = false;
 }
 
 
@@ -73,8 +91,8 @@ void fanOff() {
 // 回傳：風扇目前是否開著
 // ------------------------------------------------------------
 bool isFanOn() {
-  // TODO(玟君)
-  return false;  // 暫時的回傳值，只是為了能編譯，實作後刪除
+  // TODO(淯瑋)
+  return fanRunning;
 }
 
 
