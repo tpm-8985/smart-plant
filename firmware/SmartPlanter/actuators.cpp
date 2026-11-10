@@ -13,7 +13,9 @@
 //   10/21–10/27：由開發板控制繼電器開關水泵與風扇，連續運作無異常
 #include "config.h"
 #include "interfaces.h"
-
+const int relayPin=7;
+const int buzzerPin = 8;
+int relay_is_on=0;//0=off,1=on
 
 // ------------------------------------------------------------
 // void actuatorsInit()
@@ -24,8 +26,12 @@
 // ------------------------------------------------------------
 void actuatorsInit() {
   // TODO(玟君)
-}
+  pinMode(relayPin, OUTPUT);
+  digitalWrite(relayPin,HIGH);
 
+  pinMode(buzzerPin, OUTPUT);
+  digitalWrite(buzzerPin, HIGH);
+}
 
 // ------------------------------------------------------------
 // void pumpOn() / void pumpOff()
@@ -35,10 +41,15 @@ void actuatorsInit() {
 // ------------------------------------------------------------
 void pumpOn() {
   // TODO(玟君)
+  digitalWrite(relayPin,LOW);
+  relay_is_on=1;
 }
+
 
 void pumpOff() {
   // TODO(玟君)
+  digitalWrite(relayPin,HIGH);
+  relay_is_on=0;
 }
 
 
@@ -49,7 +60,8 @@ void pumpOff() {
 // ------------------------------------------------------------
 bool isPumpOn() {
   // TODO(玟君)
-  return false;  // 暫時的回傳值，只是為了能編譯，實作後刪除
+  return relay_is_on==1;
+  // 暫時的回傳值，只是為了能編譯，實作後刪除
 }
 
 
@@ -66,12 +78,12 @@ void fanOff() {
   // TODO(玟君)
 }
 
-
 // ------------------------------------------------------------
 // bool isFanOn()
 // 呼叫者：主程式的狀態輸出
 // 回傳：風扇目前是否開著
 // ------------------------------------------------------------
+
 bool isFanOn() {
   // TODO(玟君)
   return false;  // 暫時的回傳值，只是為了能編譯，實作後刪除
@@ -85,8 +97,10 @@ bool isFanOn() {
 // ------------------------------------------------------------
 void buzzerOn() {
   // TODO(玟君)
+  digitalWrite(buzzerPin, LOW);
 }
 
 void buzzerOff() {
   // TODO(玟君)
+  digitalWrite(buzzerPin, HIGH);
 }
