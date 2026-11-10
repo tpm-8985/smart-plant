@@ -17,6 +17,7 @@
 //
 // 規則：這個檔案裡不能用 delay() 等待，計時一律用 millis()。
 //      否則澆水或等待滲透的期間，安全檢查和通知都會停住。
+#include <Arduino.h>
 #include "config.h"
 #include "interfaces.h"
 
