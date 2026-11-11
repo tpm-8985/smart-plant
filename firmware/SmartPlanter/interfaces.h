@@ -36,12 +36,10 @@ void controlUpdate(int moisture); // 每圈呼叫一次，狀態機走一步
 const char* controlStateName();   // 目前狀態的名稱（除錯用）
 
 // ---------- 通知（承儒）notify.cpp ----------
-// 三種需要通知的異常
-enum AlertType { ALERT_LOW_WATER, ALERT_TOO_WET, ALERT_SENSOR_FAULT, ALERT_COUNT };
-void notifyInit();                 // 開機初始化（連上 Wi-Fi）
-void notifyUpdate();               // 每圈呼叫（維持 Wi-Fi 連線）
-void sendAlert(AlertType type);    // 發出通知；同一種異常在恢復前只寄一次
-void clearAlert(AlertType type);   // 異常恢復正常時呼叫，允許下次再寄
+// ---------- Wi-Fi 與 Email（承儒）----------
+// AlertType、sendAlert、clearAlert 由 mail_service.h 統一宣告。
+#include "wifi_service.h"
+#include "mail_service.h"
 
 // ---------- 模擬模式的假資料（建瑄）SmartPlanter.ino ----------
 // 沒有接感測器時，感測模組改回傳這兩個值，由主程式透過 Serial 指令設定
