@@ -1,6 +1,14 @@
 #include "mail_service.h"
 #include "wifi_service.h"
+#if __has_include("secrets.h")
 #include "secrets.h"
+#else
+#define GOOGLE_APP_PASSWORD ""
+#define ALERT_EMAIL_FROM ""
+#define ALERT_EMAIL_TO ""
+#define SMTP_HOST "smtp.gmail.com"
+#define SMTP_PORT 465
+#endif
 #include <Arduino.h>
 #include <WiFiSSLClient.h>
 namespace {

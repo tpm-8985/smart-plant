@@ -1,5 +1,10 @@
 #include "wifi_service.h"
+#if __has_include("secrets.h")
 #include "secrets.h"
+#else
+#define WIFI_SSID ""
+#define WIFI_PASSWORD ""
+#endif
 #include <WiFiS3.h>
 #include <Arduino_LED_Matrix.h>
 namespace {
@@ -55,7 +60,7 @@ void wifiUpdate() {
     wasConnected = connected;
   }
   if (connected) return;
-  if (!attempted || millis() - lastAttempt >= RETRY_MS) {
+  if ((!attempted || millis() - lastAttempt >= RETRY_MS) && WIFI_SSID[0]) {
     attempted = true;
     Serial.println("Connecting to WiFi...");
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD); // 底層呼叫仍可能阻塞

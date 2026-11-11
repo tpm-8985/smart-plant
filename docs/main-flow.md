@@ -91,4 +91,5 @@ stateDiagram-v2
 | 控制邏輯 | `control.cpp` | 明杰 | `controlUpdate()` |
 | 致動器 | `actuators.cpp` | 玟君 | `pumpOn()`、`fanOn()`、`buzzerOn()` |
 | 水位與安全 | `safety.cpp` | 娟華 | `checkWaterSafety()`、`isLowWater()` |
-| 通知 | `notify.cpp` | 承儒 | `sendAlert()`、`notifyUpdate()` |
+| Wi-Fi 連線 | `wifi_service.cpp` | 承儒 | `wifiInit()`、`wifiUpdate()` |
+| Email 通知 | `mail_service.cpp` | 承儒 | `sendAlert()`、`mailUpdate()` |

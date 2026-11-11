@@ -29,63 +29,32 @@ void printStatus();
 void handleSerialCommands();
 // 模擬模式的假資料，宣告在 interfaces.h，由 handleSerialCommands() 設定
 
-// 最新濕度與上次量測時間
-int latestMoisture = -1;
-unsigned long lastSampleAt = 0;
-
 // ------------------------------------------------------------
 // void setup()
 // 功能：開機時執行一次，初始化所有模組。
 // 流程：
 //   1. 啟動 Serial（鮑率自訂，Serial Monitor 要設成一樣）
 //   2. 最先呼叫 actuatorsInit()，確保開機時水泵、風扇都是關的
-//   3. 呼叫 soilInit()、safetyInit()、controlInit()、notifyInit()
+//   3. 呼叫 soilInit()、safetyInit()、controlInit()、wifiInit()、mailInit()
 //   4. 先量一次土壤濕度，讓第一圈 loop 就有值可用
 //   5. 模擬模式時，印出可用的 Serial 指令
 // ------------------------------------------------------------
 void setup() {
-  // TODO(建瑄)
-<<<<<<< Updated upstream
-
-  Serial.begin(9600);
-
+  Serial.begin(115200);
   actuatorsInit();
   soilInit();
   safetyInit();
   controlInit();
-  notifyInit();
+  wifiInit();
+  mailInit();
 
   latestMoisture = readSoilMoisture();
   lastSampleAt = millis();
 
-  printStatus();
-=======
-  Serial.begin(115200);
-
-    // 先初始化致動器，目標是全部關閉
-    actuatorsInit();
-
-    soilInit();
-    safetyInit();
-    controlInit();
-    wifiInit();
-    mailInit();
-
-    // 取得第一筆濕度
-    latestMoisture = readSoilMoisture();
-    lastSampleAt = millis();
-
-    Serial.println("Smart Planter started");
-
 #if SIMULATE_SENSORS
-    Serial.println("Simulation mode");
-    Serial.println("M=20  Set moisture to 20%");
-    Serial.println("W=1   Simulate low water");
-    Serial.println("W=0   Simulate normal water");
+  Serial.println("Simulation mode: M=20 sets moisture, W=1/0 sets water level");
 #endif
-
-    printStatus();
->>>>>>> Stashed changes
+  printStatus();
 }
 
 
@@ -99,65 +68,40 @@ void setup() {
 //   2. 量測：距上次量測滿 SAMPLE_INTERVAL_MS，就呼叫 readSoilMoisture() 更新最新濕度，
 //            否則沿用上次的值；DEBUG_PRINT 開啟時，量測後呼叫 printStatus()
 //   3. 控制：每一圈都呼叫 controlUpdate(最新濕度)，即使這圈沒有新讀值
-//   4. 通知：呼叫 updateAlerts(是否低水位, 最新濕度)，再呼叫 notifyUpdate()
+//   4. 通知：呼叫 updateAlerts()，並更新 Wi-Fi 與 Email 服務
 // 規則：整個 loop 不可使用 delay() 長時間等待，否則安全檢查會被耽誤。
 // ------------------------------------------------------------
 void loop() {
-  // TODO(建瑄)
-<<<<<<< Updated upstream
-
-  #if SIMULATE_SENSORS
-    handleSerialCommands();
-  #endif
-
-    bool lowWater = checkWaterSafety();
-
-    unsigned long now = millis();
-
-    if ((unsigned long)(now - lastSampleAt) >= SAMPLE_INTERVAL_MS) {
-      lastSampleAt = now;
-      latestMoisture = readSoilMoisture();
-      printStatus();
-    }
-
-    controlUpdate(latestMoisture);
-    updateAlerts(lowWater, latestMoisture);
-    notifyUpdate();
-
-=======
   // 0. 模擬模式：處理 Serial 指令
 #if SIMULATE_SENSORS
-    handleSerialCommands();
+  handleSerialCommands();
 #endif
 
-    // 1. 安全檢查
-    bool lowWater = checkWaterSafety();
+  // 1. 安全檢查
+  const bool lowWater = checkWaterSafety();
 
-    // 2. 定時讀取土壤濕度
-    unsigned long now = millis();
-    bool newSample = false;
+  // 2. 定時讀取土壤濕度
+  const unsigned long now = millis();
+  bool newSample = false;
 
-    if (now - lastSampleAt >= SAMPLE_INTERVAL_MS) {
-        lastSampleAt = now;
-        latestMoisture = readSoilMoisture();
-        newSample = true;
-    }
+  if (now - lastSampleAt >= SAMPLE_INTERVAL_MS) {
+    lastSampleAt = now;
+    latestMoisture = readSoilMoisture();
+    newSample = true;
+  }
 
-    // 3. 控制狀態機
-    controlUpdate(latestMoisture);
+  // 3. 控制狀態機
+  controlUpdate(latestMoisture);
 
-    // 4. 定期輸出目前狀態
+  // 4. 定期輸出目前狀態
 #if DEBUG_PRINT
-    if (newSample) {
-        printStatus();
-    }
+  if (newSample) printStatus();
 #endif
 
-    // 5. 異常通知
-    updateAlerts(lowWater, latestMoisture);
-    wifiUpdate();
-    mailUpdate();
->>>>>>> Stashed changes
+  // 5. 異常通知與連線維護
+  updateAlerts(lowWater, latestMoisture);
+  wifiUpdate();
+  mailUpdate();
 }
 
 
@@ -206,37 +150,18 @@ void updateAlerts(bool lowWater, int moisture) {
 //          （狀態名稱用 controlStateName() 取得）
 // ------------------------------------------------------------
 void printStatus() {
-  // TODO(建瑄)
-<<<<<<< Updated upstream
-
-  Serial.print("Soil moisture: ");
-
-  if (latestMoisture == -1) {
-    Serial.println("SENSOR_FAULT");
-  } else {
-    Serial.print(latestMoisture);
-    Serial.println("%");
-  }
-=======
   Serial.print("Moisture: ");
-    Serial.print(latestMoisture);
-    Serial.print("% | ");
+  if (latestMoisture < 0 || latestMoisture > 100) Serial.print("SENSOR_FAULT");
+  else { Serial.print(latestMoisture); Serial.print('%'); }
+  Serial.print(" | Low Water: ");
+  Serial.print(isLowWater());
+  Serial.print(" | Pump: ");
+  Serial.print(isPumpOn());
+  Serial.print(" | Fan: ");
+  Serial.print(isFanOn());
+  Serial.print(" | State: ");
+  Serial.println(controlStateName());
 
-    Serial.print("Low Water: ");
-    Serial.print(isLowWater());
-    Serial.print(" | ");
-
-    Serial.print("Pump: ");
-    Serial.print(isPumpOn());
-    Serial.print(" | ");
-
-    Serial.print("Fan: ");
-    Serial.print(isFanOn());
-    Serial.print(" | ");
-
-    Serial.print("State: ");
-    Serial.println(controlStateName());
->>>>>>> Stashed changes
 }
 
 

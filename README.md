@@ -16,8 +16,9 @@ smart-watering-planter/
 │   ├── control.cpp          控制狀態機（明杰）
 │   ├── actuators.cpp        水泵、風扇、蜂鳴器（玟君）
 │   ├── safety.cpp           水位與安全保護（娟華）
-│   ├── notify.cpp           Wi-Fi 與 Email（承儒）
-│   └── secrets.example.h    Wi-Fi 與寄信資料的範本
+│   ├── wifi_service.cpp     Wi-Fi 連線（承儒）
+│   ├── mail_service.cpp    Email 通知（承儒）
+│   └── secrets.example.h   本機 Wi-Fi 與寄信資料範本
 ├── docs/main-flow.md        主迴圈流程圖與控制狀態機
 └── data/                    實驗數據
 ```
@@ -51,7 +52,7 @@ smart-watering-planter/
 
 ### Wi-Fi 與 Email
 
-把 `secrets.example.h` 複製一份，改名為 `secrets.h`，填入 Wi-Fi 與寄信資料。**`secrets.h` 已列在 `.gitignore`，絕對不要把密碼寫進其他會上傳的檔案。** 沒有 `secrets.h` 的組員也必須能編譯，這點由承儒在 `notify.cpp` 處理。
+把 `firmware/SmartPlanter/secrets.example.h` 複製到同一資料夾並命名為 `secrets.h`，再填入本機 Wi-Fi 與寄信資料。`secrets.h` 已列在 `.gitignore`，不要把憑證寫進其他會提交的檔案。沒有 `secrets.h` 時，韌體仍可編譯，但 Wi-Fi 與 Email 功能會停用。若憑證曾經提交或推送至遠端，請先在對應服務撤銷並更換。
 
 ## 協作規則
 

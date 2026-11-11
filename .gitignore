@@ -1,0 +1,9 @@
+# Local device and email credentials
+firmware/SmartPlanter/secrets.h
+
+# Arduino build output
+firmware/SmartPlanter/build/
+
+# Editor and OS files
+.DS_Store
+.vscode/
