@@ -1,110 +1,91 @@
-// actuators.cpp — 水泵、風扇、蜂鳴器驅動　負責人：玟君（蜂鳴器接線與提醒方式由娟華決定）
-//
-// 這個檔案的工作：
-//   只負責把致動器「打開」或「關掉」，並記住目前的開關狀態，不做任何判斷。
-//   要不要開水泵由 control.cpp 決定，能不能開由 safety.cpp 決定。
-//
-// 會用到 config.h 的常數：
-//   PIN_PUMP_RELAY、PIN_FAN_RELAY、RELAY_ACTIVE_LOW、PIN_BUZZER
-//
-// 時程（依進度規劃表）：
-//   10/07–10/13：確認水泵、繼電器、風扇的電壓與電流，畫接線圖，確認外接電源
-//   10/14–10/20：測試繼電器、水泵、風扇都能各自開關
-//   10/21–10/27：由開發板控制繼電器開關水泵與風扇，連續運作無異常
+
 #include "config.h"
 #include "interfaces.h"
 
+// 記錄致動器的軟體狀態
+static bool pumpRunning = false;
 static bool fanRunning = false;
 
-// ------------------------------------------------------------
-// void actuatorsInit()
-// 呼叫者：主程式 setup()，所有初始化中最先執行
-// 功能：設定水泵、風扇、蜂鳴器的腳位，並讓它們全部處於關閉狀態。
-// 注意：有些繼電器是低電位觸發，腳位剛設成輸出的瞬間可能會短暫觸發。
-//      要確認開機時水泵不會被誤開，必要時調整設定腳位的順序。
-// ------------------------------------------------------------
-void actuatorsInit() {
-  // TODO(玟君)
-
-  // 先設定關閉電位，再切換成輸出
-  digitalWrite(PIN_FAN_INA, LOW);
-  digitalWrite(PIN_FAN_INB, LOW);
-
-  pinMode(PIN_FAN_INA, OUTPUT);
-  pinMode(PIN_FAN_INB, OUTPUT);
-
-  fanRunning = false;
+// 繼電器電位設定
+// RELAY_ACTIVE_LOW = true：LOW 開啟、HIGH 關閉
+static uint8_t relayOnLevel() {
+    return RELAY_ACTIVE_LOW ? LOW : HIGH;
 }
 
+static uint8_t relayOffLevel() {
+    return RELAY_ACTIVE_LOW ? HIGH : LOW;
+}
 
-// ------------------------------------------------------------
-// void pumpOn() / void pumpOff()
-// 呼叫者：控制狀態機；pumpOff() 也會被安全模組呼叫
-// 功能：透過繼電器打開或關閉水泵，並記錄目前狀態。
-// 注意：依 RELAY_ACTIVE_LOW 決定要輸出高電位還是低電位才算「開」。
-// ------------------------------------------------------------
+// ======================================
+// 初始化所有致動器
+// ======================================
+void actuatorsInit() {
+
+    // 1. 水泵：先設定關閉電位
+    digitalWrite(PIN_PUMP_RELAY, relayOffLevel());
+    pinMode(PIN_PUMP_RELAY, OUTPUT);
+
+    // 2. 風扇：兩個控制訊號都設 LOW
+    digitalWrite(PIN_FAN_INA, LOW);
+    digitalWrite(PIN_FAN_INB, LOW);
+
+    pinMode(PIN_FAN_INA, OUTPUT);
+    pinMode(PIN_FAN_INB, OUTPUT);
+
+    // 3. 蜂鳴器：依原本 PR #2，HIGH 表示關閉
+    digitalWrite(PIN_BUZZER, HIGH);
+    pinMode(PIN_BUZZER, OUTPUT);
+
+    // 4. 更新軟體狀態
+    pumpRunning = false;
+    fanRunning = false;
+}
+
+// ======================================
+// 水泵控制
+// ======================================
 void pumpOn() {
-  // TODO(玟君)
+    digitalWrite(PIN_PUMP_RELAY, relayOnLevel());
+    pumpRunning = true;
 }
 
 void pumpOff() {
-  // TODO(玟君)
+    digitalWrite(PIN_PUMP_RELAY, relayOffLevel());
+    pumpRunning = false;
 }
 
-
-// ------------------------------------------------------------
-// bool isPumpOn()
-// 呼叫者：安全模組、主程式的狀態輸出
-// 回傳：水泵目前是否開著
-// ------------------------------------------------------------
 bool isPumpOn() {
-  // TODO(玟君)
-  return false;  // 暫時的回傳值，只是為了能編譯，實作後刪除
+    return pumpRunning;
 }
 
-
-// ------------------------------------------------------------
-// void fanOn() / void fanOff()
-// 呼叫者：控制狀態機
-// 功能：透過繼電器打開或關閉風扇，並記錄目前狀態。
-// ------------------------------------------------------------
+// ======================================
+// 風扇控制
+// ======================================
 void fanOn() {
-  // TODO(淯瑋)
-  digitalWrite(PIN_FAN_INA, LOW);
-  digitalWrite(PIN_FAN_INB, HIGH);
+    digitalWrite(PIN_FAN_INA, LOW);
+    digitalWrite(PIN_FAN_INB, HIGH);
 
-  fanRunning = true;
+    fanRunning = true;
 }
 
 void fanOff() {
-  // TODO(淯瑋)
-  digitalWrite(PIN_FAN_INA, LOW);
-  digitalWrite(PIN_FAN_INB, LOW);
+    digitalWrite(PIN_FAN_INA, LOW);
+    digitalWrite(PIN_FAN_INB, LOW);
 
-  fanRunning = false;
+    fanRunning = false;
 }
 
-
-// ------------------------------------------------------------
-// bool isFanOn()
-// 呼叫者：主程式的狀態輸出
-// 回傳：風扇目前是否開著
-// ------------------------------------------------------------
 bool isFanOn() {
-  // TODO(淯瑋)
-  return fanRunning;
+    return fanRunning;
 }
 
-
-// ------------------------------------------------------------
-// void buzzerOn() / void buzzerOff()
-// 呼叫者：安全模組
-// 功能：讓有源蜂鳴器響或停。間歇鳴叫等提醒方式由安全模組（娟華）控制。
-// ------------------------------------------------------------
+// ======================================
+// 蜂鳴器控制
+// ======================================
 void buzzerOn() {
-  // TODO(玟君)
+    digitalWrite(PIN_BUZZER, LOW);
 }
 
 void buzzerOff() {
-  // TODO(玟君)
+    digitalWrite(PIN_BUZZER, HIGH);
 }
