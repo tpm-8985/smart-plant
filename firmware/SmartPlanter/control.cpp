@@ -17,56 +17,275 @@
 //
 // 規則：這個檔案裡不能用 delay() 等待，計時一律用 millis()。
 //      否則澆水或等待滲透的期間，安全檢查和通知都會停住。
+#include <Arduino.h>
 #include "config.h"
 #include "interfaces.h"
 
+// ============================================================
+// 控制參數
+// config.h 目前尚未定義實際數值，因此先在這裡設定預設值。
+// 後續應依照土壤、花盆與水泵的實測結果調整。
+// ============================================================
 
-// ------------------------------------------------------------
-// void controlInit()
-// 呼叫者：主程式 setup()，開機時一次
-// 功能：讓狀態機從 IDLE 開始。
-// ------------------------------------------------------------
+// 濕度門檻（百分比）
+//static constexpr int MOISTURE_DRY = 30;
+//static constexpr int MOISTURE_TARGET = 45;
+//static constexpr int MOISTURE_WET = 70;
+
+// 風扇停止門檻：低於啟動門檻，形成遲滯區間
+static constexpr int CONTROL_DRYING_STOP =
+    MOISTURE_WET - 5;
+
+// 澆水時間（毫秒）
+static constexpr unsigned long CONTROL_MIN_WATER_MS = 1000UL;
+static constexpr unsigned long CONTROL_MAX_WATER_MS = 8000UL;
+
+// 澆水後等待水分滲透的時間
+//static constexpr unsigned long SOAK_WAIT_MS = 30000UL;
+
+// ============================================================
+// 狀態定義
+// ============================================================
+
+enum ControlState {
+  STATE_IDLE,
+  STATE_WATERING,
+  STATE_SOAKING,
+  STATE_DRYING,
+  STATE_FAULT
+};
+
+static ControlState currentState = STATE_IDLE;
+
+// 記錄目前狀態開始的時間
+static unsigned long stateStartTime = 0;
+
+// 本次預計澆水時間
+static unsigned long wateringDurationMs = 0;
+
+// ============================================================
+// 輔助函式：切換狀態
+// ============================================================
+
+static void enterState(ControlState nextState) {
+  currentState = nextState;
+  stateStartTime = millis();
+}
+
+// 確保水泵和風扇不會同時運轉
+static void stopPumpAndFan() {
+  pumpOff();
+  fanOff();
+}
+
+// ============================================================
+// 輔助函式：依缺水程度計算澆水時間
+//
+// 濕度越低，澆水時間越長。
+// 濕度接近乾燥門檻時，使用較短的時間。
+// ============================================================
+
+static unsigned long calculateWateringDuration(int moisture) {
+
+    const int deficit =
+        MOISTURE_TARGET - moisture;
+
+    const int maxDeficit =
+        MOISTURE_TARGET;
+
+    if (maxDeficit <= 0) {
+        return CONTROL_MIN_WATER_MS;
+    }
+
+    long percentage =
+        (static_cast<long>(deficit) * 100L) / maxDeficit;
+
+    if (percentage < 0) {
+        percentage = 0;
+    }
+
+    if (percentage > 100) {
+        percentage = 100;
+    }
+
+    const unsigned long durationRange =
+        CONTROL_MAX_WATER_MS - CONTROL_MIN_WATER_MS;
+
+    return CONTROL_MIN_WATER_MS
+        + (durationRange * static_cast<unsigned long>(percentage))
+            / 100UL;
+}
+
+// ============================================================
+// controlInit()
+// 開機初始化：進入 IDLE，確保致動器關閉。
+// ============================================================
+
 void controlInit() {
-  // TODO(明杰)
+  stopPumpAndFan();
+
+  wateringDurationMs = 0;
+  stateStartTime = millis();
+  currentState = STATE_IDLE;
 }
 
+// ============================================================
+// controlUpdate(int moisture)
+// 每次呼叫只執行一次狀態判斷，不使用 delay()。
+//
+// moisture：0～100 表示濕度百分比；-1 表示讀值異常。
+// 其他超出範圍的數值也視為異常。
+// ============================================================
 
-// ------------------------------------------------------------
-// void controlUpdate(int moisture)
-// 呼叫者：主程式 ③ 控制，每一圈都呼叫一次
-// 參數：最新的土壤濕度 0–100 (%)，-1 代表讀值異常
-// 功能：依目前狀態做一次判斷與動作，然後立刻返回，不可停下來等待。
-//
-// 狀態與轉換（與 docs/main-flow.md 的狀態圖一致）：
-//   IDLE 待機
-//     - 太乾，且 isPumpAllowed() 為 true → 依缺水程度算出澆水時間，開水泵，進入 WATERING
-//     - 太濕 → 開風扇，進入 DRYING
-//   WATERING 澆水
-//     - 澆水時間到，或 isPumpAllowed() 變成 false（途中低水位）→ 關水泵，進入 SOAKING
-//   SOAKING 等待滲透
-//     - 不依讀值做任何決定；滿 SOAK_WAIT_MS → 回到 IDLE 重新判斷
-//   DRYING 風乾
-//     - 濕度回到正常範圍 → 關風扇，回到 IDLE
-//   FAULT 感測器異常
-//     - 不論目前在哪個狀態，只要 moisture 為 -1 → 關水泵與風扇，進入 FAULT
-//     - 讀值恢復正常 → 回到 IDLE 重新判斷
-//
-// 自主設計重點：
-//   - 自適應澆水：澆水時間依缺水程度決定，而不是固定秒數
-//   - 遲滯：開與關使用不同門檻，避免濕度在門檻附近時頻繁開關
-//   - 可以自行新增 static 輔助函式與變數，例如計算澆水時間、記錄狀態開始的時間
-// ------------------------------------------------------------
 void controlUpdate(int moisture) {
-  // TODO(明杰)
+  const unsigned long now = millis();
+
+  // ----------------------------------------------------------
+  // 第一優先：感測器故障保護
+  // 無論目前在哪個狀態，異常時都立即停止水泵與風扇。
+  // ----------------------------------------------------------
+
+  if (moisture < 0 || moisture > 100) {
+    stopPumpAndFan();
+    wateringDurationMs = 0;
+
+    if (currentState != STATE_FAULT) {
+      enterState(STATE_FAULT);
+    }
+
+    return;
+  }
+
+  // 故障恢復後回到 IDLE，重新判斷環境
+  if (currentState == STATE_FAULT) {
+    stopPumpAndFan();
+    enterState(STATE_IDLE);
+    return;
+  }
+
+  // ----------------------------------------------------------
+  // 狀態機
+  // ----------------------------------------------------------
+
+  switch (currentState) {
+
+    // --------------------------------------------------------
+    // IDLE：待機
+    // --------------------------------------------------------
+    case STATE_IDLE: {
+      stopPumpAndFan();
+
+      // 土壤太乾，而且水泵目前允許運作
+      if (moisture < MOISTURE_DRY) {
+        if (isPumpAllowed()) {
+          wateringDurationMs =
+              calculateWateringDuration(moisture);
+
+          // 開泵前再次確認安全條件
+          if (isPumpAllowed()) {
+            fanOff();
+            pumpOn();
+            enterState(STATE_WATERING);
+          }
+        }
+      }
+
+      // 土壤太濕，啟動風扇
+      else if (moisture > MOISTURE_WET) {
+        pumpOff();
+        fanOn();
+        enterState(STATE_DRYING);
+      }
+
+      break;
+    }
+
+    // --------------------------------------------------------
+    // WATERING：澆水
+    // 澆水時間到，或水泵不再被允許運作，就停止澆水。
+    // --------------------------------------------------------
+    case STATE_WATERING: {
+      // 感測器故障已在 switch 前處理。
+      // 水位安全由 isPumpAllowed() 判斷。
+      if (!isPumpAllowed()) {
+        pumpOff();
+        fanOff();
+
+        // 等待已澆入的水滲透，再重新判斷
+        enterState(STATE_SOAKING);
+      }
+      else if (now - stateStartTime >= wateringDurationMs) {
+        pumpOff();
+        fanOff();
+        enterState(STATE_SOAKING);
+      }
+
+      break;
+    }
+
+    // --------------------------------------------------------
+    // SOAKING：等待滲透
+    // 此期間不根據濕度啟動新的澆水動作。
+    // --------------------------------------------------------
+    case STATE_SOAKING: {
+      stopPumpAndFan();
+
+      if (now - stateStartTime >= SOAK_WAIT_MS) {
+        enterState(STATE_IDLE);
+      }
+
+      break;
+    }
+
+    // --------------------------------------------------------
+    // DRYING：風乾
+    // 使用不同的啟動與停止門檻，避免風扇頻繁開關。
+    // --------------------------------------------------------
+    case STATE_DRYING: {
+      pumpOff();
+      fanOn();
+
+      if (moisture <= CONTROL_DRYING_STOP) {
+        fanOff();
+        enterState(STATE_IDLE);
+      }
+
+      break;
+    }
+
+    // --------------------------------------------------------
+    // FAULT：故障
+    // --------------------------------------------------------
+    case STATE_FAULT: {
+      stopPumpAndFan();
+      break;
+    }
+  }
 }
 
+// ============================================================
+// controlStateName()
+// 回傳目前狀態的名稱，供 Serial Monitor 除錯使用。
+// ============================================================
 
-// ------------------------------------------------------------
-// const char* controlStateName()
-// 呼叫者：主程式的狀態輸出
-// 回傳：目前狀態的名稱，例如 "IDLE"、"WATERING"、"SOAKING"、"DRYING"、"FAULT"
-// ------------------------------------------------------------
 const char* controlStateName() {
-  // TODO(明杰)
-  return "TODO";  // 暫時的回傳值，只是為了能編譯，實作後刪除
+  switch (currentState) {
+    case STATE_IDLE:
+      return "IDLE";
+
+    case STATE_WATERING:
+      return "WATERING";
+
+    case STATE_SOAKING:
+      return "SOAKING";
+
+    case STATE_DRYING:
+      return "DRYING";
+
+    case STATE_FAULT:
+      return "FAULT";
+
+    default:
+      return "UNKNOWN";
+  }
 }
